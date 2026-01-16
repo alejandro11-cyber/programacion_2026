@@ -1,1 +1,0 @@
-# programacion_2026
