@@ -3,5 +3,3 @@ Matricula=A25216362
 NOMBRE_THALAN_ALEJANDRO_MARES_VERA
 
 GMAIL.thalanalejandromares@gmail.com
-
-TELEFONO=9991054828
