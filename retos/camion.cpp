@@ -1,61 +1,37 @@
 #include "camion.h"
 #include <iostream>
 
-// Constructor por defecto
-Vehiculo::camion() {
-    marca = "";
-    modelo = "";
-    anio = 0;
-    placa = 0;
+Camion::Camion() : Vehiculo() {
+    maximo_de_peso = 0.0;
+    capacidad_personas = 0;
 }
 
-// Constructor con parámetros
-Vehiculo::Vehiculo(std::string marca, std::string modelo, int año) {
-    this->marca = marca;
-    this->modelo = modelo;
-    this->año = anio;
-    this->placa = 0; 
+// Constructor por defecto
+Camion::Camion(std::string marca, std::string modelo, int anio, std::string placa,
+           float maximo_de_peso, std::string capacidad_personas) 
+           : Vehiculo(marca, modelo, anio, placa) {
+
+            this->maximo_de_peso = maximo_de_peso;
+    this->capacidad_personas = capacidad_personas;
 }
 
 // Métodos para actualizar
-void camion::actualizarMarca(std::string nuevaMarca) {
-    marca = nuevaMarca;
-}
 
-void camion::actualizarModelo(std::string nuevoModelo) {
-    modelo = nuevoModelo;
-}
+   void actualizarMaximoDePeso(float nuevoMaximoDePeso);
+    void actualizarCapacidadPersonas(std::string nuevaCapacidadPersonas);
 
-void camion::actualizarAño(int nuevoAnio) {
-    año = nuevoAnio;
-}
-
-void camion::actualizarPlaca(std::string nuevaPlaca) {
-    placa = nuevaPlaca;
-}
-
-
-// Método para mostrar
-void camion::mostrarInformacion() {
-    std::cout << "Marca: " << marca << std::endl;
-    std::cout << "Modelo: " << modelo << std::endl;
-    std::cout << "Anio: " << año << std::endl;
-    std::cout << "Placas: " << placa << std::endl;
+// Método para mostrar información
+   void Camion::mostrarInformacion() {
+    Vehiculo::mostrarInformacion(); 
+    std::cout << "Maximo peso: " << maximo_de_peso << " toneladas" << std::endl;
+    std::cout << "Maximo personas: " << capacidad_personas << std::endl;
 }
 
 // Getters
-std::string camion::obtenerMarca() {
-    return marca;
-}
+float Camion::obtenerMaximoDePeso() {
+    return maximo_de_peso;
+    
 
-std::string camion::obtenerModelo() {
-    return modelo;
-}
-
-int camion::obtenerAnio() {
-    return año;
-}
-
-int camion::obtenerPlaca() {
-    return placa;
+int Camion::obtenerCapacidadPersonas() {
+    return std::stoi(capacidad_personas);
 }

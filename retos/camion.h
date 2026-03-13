@@ -1,34 +1,31 @@
-#ifndef camion_H
-#define camion_H
+#ifndef CAMION_H
+#define CAMION_H
 
+#include "vehiculo.h"
 #include <string>
 
-class camion : public Vehiculo {
-protected:
-    std::string marca;
-    std::string modelo;
-    int anio;
-    std::string placa;
+class Camion : public Vehiculo {
+
+private:
+    float maximo_de_peso;           // máximo de peso que puede cargar
+    std::string capacidad_personas; // capacidad de personas del camión
 
 public:
     // Constructores
-    camion();
-    camion(std::string marca, std::string modelo, int anio, std::string placa);
+    Camion();
+    Camion(std::string marca, std::string modelo, int anio, std::string placa,
+           float maximo_de_peso, std::string capacidad_personas);
 
-    // Métodos para actualizar
-    void actualizarMarca(std::string nuevaMarca);
-    void actualizarModelo(std::string nuevoModelo);
-    void actualizarAnio(int nuevoAnio);
-    void actualizarPlaca(std::string nuevaPlaca);
+    // Métodos para actualizar atributos
+    void actualizarMaximoDePeso(float nuevoMaximoDePeso);
+    void actualizarCapacidadPersonas(std::string nuevaCapacidadPersonas);
 
-    // Métodos para mostrar
+    // Métodos para mostrar información
     void mostrarInformacion();
 
-    // Getters
-    std::string obtenerMarca();
-    std::string obtenerModelo();
-    int obtenerAnio();
-    std::string obtenerPlaca();
+    // Métodos para obtener atributos
+    float obtenerMaximoDePeso();
+    std::string obtenerCapacidadPersonas();
 };
 
-#endif // camion_H
+#endif // CAMION_H
