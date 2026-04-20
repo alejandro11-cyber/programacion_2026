@@ -1,145 +1,88 @@
-#include <iostream>
-#include <string>
-#include <cstdlib>
 #include <curl/curl.h>
-#include "Conversacion.h"
-#include "Mensaje.h"
-#include "../third_party/json.hpp"
+#include "conversacion.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include <stdexcept>
 
-using json = nlohmann::json;
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-// Callback para recibir respuesta de libcurl
-static size_t escribir_callback(void* contenidos, size_t tam, size_t nmemb, void* usuario) {
-    ((std::string*)usuario)->append((char*)contenidos, tam * nmemb);
-    return tam * nmemb;
+// Callback para escribir la respuesta en un string
+size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total_size = size * nmemb;
+    auto* output = static_cast<std::string*>(userp);
+    output->append(static_cast<char*>(contents), total_size);
+    return total_size;
 }
 
-// Llamada simplificada a OpenAI (formato chat completions)
-std::string llamar_openai(const std::string& api_key, const std::string& base_url, const std::string& modelo, const std::string& prompt) {
+// Función para realizar la petición al API
+std::string request_chat(const std::string& api_key,
+                         const std::string& base_url,
+                         const std::string& model,
+                         const std::string& prompt) {
     CURL* curl = curl_easy_init();
-    if (!curl) return "";
+    if (!curl) throw std::runtime_error("Error inicializando CURL");
 
-    std::string respuesta_str;
+    std::string response;
     std::string url = base_url + "/v1/chat/completions";
-    json cuerpo;
-    cuerpo["model"] = modelo;
-    cuerpo["messages"] = json::array();
-    cuerpo["messages"].push_back({{"role","user"},{"content", prompt}});
+    std::string payload = "{\"model\":\"" + model +
+                          "\",\"messages\":[{\"role\":\"user\",\"content\":\"" + prompt + "\"}]}";
 
     struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, ("Authorization: Bearer " + api_key).c_str());
     headers = curl_slist_append(headers, "Content-Type: application/json");
-
-    std::string cuerpo_str = cuerpo.dump();
+    headers = curl_slist_append(headers, ("Authorization: Bearer " + api_key).c_str());
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, cuerpo_str.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, escribir_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respuesta_str);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
-        return "";
-    }
-
+    CURLcode result = curl_easy_perform(curl);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
+    if (result != CURLE_OK) throw std::runtime_error("Fallo en CURL");
+
+    return response;
+}
+
+int main() {
     try {
-        auto j = json::parse(respuesta_str);
-        if (j.contains("choices") && j["choices"].is_array() && !j["choices"].empty()) {
-            auto contenido = j["choices"][0]["message"]["content"].get<std::string>();
-            return contenido;
-        }
-    } catch (...) {
-        return "";
-    }
-    return "";
-}
+#ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+#endif
+        Conversacion conversacion;
+        std::filesystem::create_directories("src/output");
 
-// Wrapper para Gemini (aquí reutilizamos la misma estructura; ajustar según API real)
-std::string llamar_gemini(const std::string& api_key, const std::string& base_url, const std::string& modelo, const std::string& prompt) {
-    return llamar_openai(api_key, base_url, modelo, prompt);
-}
+        std::string api_key = std::getenv("OPENAI_API_KEY");
+        if (!api_key) throw std::runtime_error("Falta OPENAI_API_KEY");
 
-int main(int argc, char** argv) {
-    std::string proveedor = "auto";
-    std::string modelo = "gpt-4o-mini";
-    std::string prompt_arg;
-    bool interactivo = true;
+        std::string prompt;
+        std::cout << "Escribe tu prompt: ";
+        std::getline(std::cin, prompt);
 
-    for (int i = 1; i < argc; ++i) {
-        std::string a = argv[i];
-        if (a == "--provider" && i + 1 < argc) proveedor = argv[++i];
-        else if (a == "--model" && i + 1 < argc) modelo = argv[++i];
-        else if (a == "--prompt" && i + 1 < argc) { prompt_arg = argv[++i]; interactivo = false; }
-    }
-
-    std::string openai_key = std::getenv("OPENAI_API_KEY") ? std::getenv("OPENAI_API_KEY") : "";
-    std::string openai_base = std::getenv("OPENAI_BASE_URL") ? std::getenv("OPENAI_BASE_URL") : "https://api.openai.com";
-    std::string gemini_key = std::getenv("GEMINI_API_KEY") ? std::getenv("GEMINI_API_KEY") : (std::getenv("GOOGLE_API_KEY") ? std::getenv("GOOGLE_API_KEY") : "");
-    std::string gemini_base = std::getenv("GEMINI_BASE_URL") ? std::getenv("GEMINI_BASE_URL") : "https://generativelanguage.googleapis.com/v1beta/openai";
-
-    Conversacion conv;
-
-    if (!interactivo) {
-        std::string mensaje_usuario = prompt_arg;
-        conv.agregarMensaje(Mensaje(Mensaje::Rol::Usuario, mensaje_usuario));
-        std::string respuesta;
-        bool uso_llm = false;
-
-        if (proveedor == "openai" || (proveedor == "auto" && modelo.rfind("gpt", 0) == 0)) {
-            if (!openai_key.empty()) {
-                respuesta = llamar_openai(openai_key, openai_base, modelo, mensaje_usuario);
-                uso_llm = !respuesta.empty();
-            }
-        } else if (proveedor == "gemini" || (proveedor == "auto" && modelo.rfind("gemini", 0) == 0)) {
-            if (!gemini_key.empty()) {
-                respuesta = llamar_gemini(gemini_key, gemini_base, modelo, mensaje_usuario);
-                uso_llm = !respuesta.empty();
-            }
+        if (prompt.empty()) {
+            std::cerr << "El prompt no puede estar vacío.\n";
+            return 1;
         }
 
-        if (!uso_llm) respuesta = mensaje_usuario; // fallback: repetir
-        conv.agregarMensaje(Mensaje(Mensaje::Rol::Asistente, respuesta));
-        std::cout << respuesta << std::endl;
-        conv.guardarEnDisco("conversaciones");
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        std::string response = request_chat(api_key, "https://api.openai.com", "gpt-4o-mini", prompt);
+        curl_global_cleanup();
+
+        conversacion.agregarMensaje(Mensaje(prompt, "Usuario"));
+        conversacion.agregarMensaje(Mensaje(response, "Ia"));
+        conversacion.guardarEnArchivo("src/output/historial_chat.txt");
+
+        std::cout << "\nRespuesta del modelo:\n" << response << "\n";
         return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
     }
-
-    // Modo interactivo
-    std::cout << "Modo interactivo. Escribe 'salir' para terminar.\n";
-    while (true) {
-        std::cout << "> ";
-        std::string linea;
-        if (!std::getline(std::cin, linea)) break;
-        if (linea == "salir" || linea == "exit") break;
-        if (linea.empty()) continue;
-
-        conv.agregarMensaje(Mensaje(Mensaje::Rol::Usuario, linea));
-        std::string respuesta;
-        bool uso_llm = false;
-
-        if (proveedor == "openai" || (proveedor == "auto" && modelo.rfind("gpt", 0) == 0)) {
-            if (!openai_key.empty()) {
-                respuesta = llamar_openai(openai_key, openai_base, modelo, linea);
-                uso_llm = !respuesta.empty();
-            }
-        } else if (proveedor == "gemini" || (proveedor == "auto" && modelo.rfind("gemini", 0) == 0)) {
-            if (!gemini_key.empty()) {
-                respuesta = llamar_gemini(gemini_key, gemini_base, modelo, linea);
-                uso_llm = !respuesta.empty();
-            }
-        }
-
-        if (!uso_llm) respuesta = linea;
-        conv.agregarMensaje(Mensaje(Mensaje::Rol::Asistente, respuesta));
-        std::cout << respuesta << "\n";
-    }
-
-    conv.guardarEnDisco("conversaciones");
-    return 0;
 }

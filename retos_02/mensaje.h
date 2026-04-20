@@ -1,27 +1,18 @@
-#pragma once
+#ifndef MENSAJE_H
+#define MENSAJE_H
 
 #include <string>
-#include <chrono>
-#include "../third_party/json.hpp"
+#include <ctime>
 
-// Clase que representa un mensaje en la conversación
 class Mensaje {
 public:
-    enum class Rol { Usuario, Sistema, Asistente };
+    std::string contenido;   
+    std::string remitente;   
+    std::time_t fechaHora;   
 
-    Mensaje() = default;
-    Mensaje(Rol rol, std::string contenido);
-
-    Rol obtenerRol() const;
-    const std::string& obtenerContenido() const;
-    std::string obtenerTimestampISO() const;
-
-    // Serialización a JSON
-    nlohmann::json a_json() const;
-    static Mensaje desde_json(const nlohmann::json& j);
-
-private:
-    Rol m_rol{Rol::Usuario};
-    std::string m_contenido;
-    std::chrono::system_clock::time_point m_ts{std::chrono::system_clock::now()};
+    // Constructor que inicializa contenido y remitente, y asigna la hora actual
+    Mensaje(const std::string& texto, const std::string& autor)
+        : contenido(texto), remitente(autor), fechaHora(std::time(nullptr)) {}
 };
+
+#endif
